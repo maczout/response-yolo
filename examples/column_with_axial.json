@@ -1,0 +1,32 @@
+{
+  "units": "SI",
+  "section": {
+    "shape": "rectangular",
+    "b": 400,
+    "h": 400
+  },
+  "concrete": {
+    "fc": 40,
+    "ecu": 0.0035,
+    "compression_model": "popovics",
+    "tension_model": "mcft"
+  },
+  "long_steel": {
+    "fy": 400,
+    "Es": 200000,
+    "fu": 550,
+    "esu": 0.05
+  },
+  "rebars": [
+    {"y": 50, "area": 1200, "_comment": "4-20M bottom"},
+    {"y": 350, "area": 1200, "_comment": "4-20M top"}
+  ],
+  "loading": {
+    "N": -1500000,
+    "_comment": "1500 kN compression"
+  },
+  "analysis": {
+    "type": "moment_curvature",
+    "n_steps": 250
+  }
+}

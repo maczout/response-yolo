@@ -1,0 +1,36 @@
+# Response-YOLO input file (R2T format)
+# Simple rectangular RC beam — 300x500mm, fc'=35 MPa, fy=400 MPa
+#
+# This example matches the simple_beam.json input for cross-validation.
+
+[UNITS]
+SI
+
+[CONCRETE]
+fc = 35
+ecu = 0.0035
+aggregate = 19
+
+[SECTION]
+# Rectangular section
+b = 300
+h = 500
+
+[LONG STEEL]
+fy = 400
+Es = 200000
+fu = 600
+esh = 0.01
+esu = 0.05
+
+[REBAR]
+# y_mm  area_mm2
+50    1500
+450   500
+
+[LOADING]
+N = 0
+
+[ANALYSIS]
+moment_curvature
+n_steps = 300
