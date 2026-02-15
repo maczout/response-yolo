@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "response-yolo"
+version = "0.1.0"
+description = "Python clone of Response-2000 (R2K) reinforced concrete sectional analysis"
+readme = "docs/USER_GUIDE.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "response-yolo contributors"},
+]
+keywords = ["reinforced-concrete", "MCFT", "structural-engineering", "moment-curvature"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[project.scripts]
+response-yolo = "response_yolo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["response_yolo*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
