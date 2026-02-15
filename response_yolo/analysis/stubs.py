@@ -16,32 +16,6 @@ from __future__ import annotations
 from response_yolo.section.cross_section import CrossSection
 
 
-class ShearAnalysis:
-    """Sectional shear analysis using the Modified Compression Field Theory.
-
-    When implemented, this will:
-    - Discretise the section into biaxial layers
-    - For each layer, solve the MCFT equilibrium/compatibility/constitutive
-      equations to find the shear stress distribution
-    - Integrate to get total V for a given gamma (shear strain)
-    - Produce V-gamma response curves
-    - Check aggregate interlock (crack-check) per Vecchio & Collins (1986)
-
-    Reference: Vecchio & Collins (1986); Bentz (2000), Chapters 2-4.
-    """
-
-    def __init__(self, section: CrossSection, **kwargs) -> None:
-        self.section = section
-        self.kwargs = kwargs
-
-    def run(self):
-        raise NotImplementedError(
-            "ShearAnalysis is not yet implemented. "
-            "This will implement the MCFT-based V-gamma sectional analysis "
-            "as described in Bentz (2000), Chapter 4."
-        )
-
-
 class MomentShearInteraction:
     """Moment-shear (M-V) interaction analysis.
 
