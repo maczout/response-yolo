@@ -203,6 +203,49 @@ class Concrete:
             return 0.0  # immediate drop
         return 0.0
 
+    # ------------------------------------------------------------------
+    # Compression softening for MCFT biaxial analysis
+    # ------------------------------------------------------------------
+    def compression_stress_softened(self, eps_magnitude: float, eps_1: float) -> float:
+        """Softened compressive stress per Vecchio & Collins (1986).
+
+        In biaxial tension-compression, transverse tensile strains reduce
+        the concrete compressive strength.  The softening factor is:
+
+            beta = 1 / (0.8 + 170 * eps_1)   ≤ 1.0
+
+        The peak stress becomes beta*fc and the peak strain becomes beta*ec.
+
+        Parameters
+        ----------
+        eps_magnitude : float
+            Compressive strain magnitude (positive value).
+        eps_1 : float
+            Principal tensile strain (positive value).
+
+        Returns
+        -------
+        float
+            Softened compressive stress as a positive magnitude.
+
+        Reference: Vecchio & Collins (1986); Bentz (2000), Chapter 3.
+        """
+        eps_1 = max(eps_1, 0.0)
+        beta = 1.0 / (0.8 + 170.0 * eps_1)
+        beta = min(beta, 1.0)
+        # Physical minimum — avoid numerical collapse
+        beta = max(beta, 0.15)
+
+        # Scale strain to the softened peak and evaluate base curve
+        if self.compression_model == CompressionModel.HOGNESTAD:
+            base = self._hognestad(eps_magnitude / beta)
+        elif self.compression_model == CompressionModel.COLLINS_MITCHELL:
+            base = self._collins_mitchell(eps_magnitude / beta)
+        else:
+            base = self._popovics(eps_magnitude / beta)
+
+        return beta * base
+
     def _mcft_tension(self, eps: float) -> float:
         """MCFT tension stiffening: f_t = f_cr / (1 + sqrt(500 * eps)).
 

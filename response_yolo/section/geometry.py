@@ -27,6 +27,12 @@ from typing import List, Optional
 
 from response_yolo.materials.concrete import Concrete
 
+# Avoid circular import — steel is only needed at runtime for type hints
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from response_yolo.materials.steel import ReinforcingSteel
+
 
 @dataclass
 class ConcreteLayer:
@@ -42,12 +48,19 @@ class ConcreteLayer:
         Width of the layer.
     material : Concrete
         Concrete material for this layer.
+    rho_y : float
+        Transverse (shear) reinforcement ratio Av/(b*s) at this layer.
+        Default 0.0 (no stirrups).  Used by MCFT biaxial analysis.
+    stirrup_material : ReinforcingSteel or None
+        Material for transverse reinforcement.  None means no stirrups.
     """
 
     y_bot: float
     y_top: float
     width: float
     material: Concrete
+    rho_y: float = 0.0
+    stirrup_material: Optional["ReinforcingSteel"] = None
 
     @property
     def y_mid(self) -> float:

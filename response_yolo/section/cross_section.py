@@ -19,6 +19,7 @@ from response_yolo.section.geometry import ConcreteLayer, _SectionShape
 from response_yolo.section.rebar import RebarBar, RebarLayer
 from response_yolo.section.tendon import Tendon
 from response_yolo.materials.concrete import Concrete
+from response_yolo.materials.steel import ReinforcingSteel
 
 
 @dataclass
@@ -69,6 +70,36 @@ class CrossSection:
 
     def add_tendon(self, tendon: Tendon) -> None:
         self.tendons.append(tendon)
+
+    def set_stirrups(
+        self,
+        Av: float,
+        s: float,
+        material: ReinforcingSteel,
+        y_bot: Optional[float] = None,
+        y_top: Optional[float] = None,
+    ) -> None:
+        """Assign transverse reinforcement to concrete layers.
+
+        Parameters
+        ----------
+        Av : float
+            Total area of stirrup legs (mm^2) at one location.
+        s : float
+            Stirrup spacing (mm).
+        material : ReinforcingSteel
+            Stirrup material.
+        y_bot, y_top : float, optional
+            Restrict assignment to layers whose centroid falls in [y_bot, y_top].
+            If None, applies to all layers.
+        """
+        for lay in self.concrete_layers:
+            if y_bot is not None and lay.y_mid < y_bot:
+                continue
+            if y_top is not None and lay.y_mid > y_top:
+                continue
+            lay.rho_y = Av / (lay.width * s)
+            lay.stirrup_material = material
 
     # ------------------------------------------------------------------
     # Gross section properties
@@ -242,6 +273,142 @@ class CrossSection:
             EI += ea * dy * dy
 
         return EA, ES, EI
+
+    # ------------------------------------------------------------------
+    # 3-DOF force/stiffness integration (for shear analysis)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def shear_strain_profile(y: float, y_bot: float, y_top: float) -> float:
+        """Parabolic shear strain distribution factor s(y).
+
+        s(y) = 1.5 * (1 - (2*(y - y_mid)/h)^2)
+
+        This is the standard parabolic shear strain profile that averages
+        to 1.0 over the depth (for rectangular sections).  It is 1.5 at
+        mid-depth and 0 at the top/bottom.
+
+        Reference: Bentz (2000), Chapter 7, Section 7-2.
+        """
+        h = y_top - y_bot
+        if h <= 0:
+            return 1.0
+        y_mid = 0.5 * (y_bot + y_top)
+        eta = 2.0 * (y - y_mid) / h  # normalized: -1 at bottom, +1 at top
+        return 1.5 * (1.0 - eta * eta)
+
+    def integrate_forces_shear(
+        self,
+        eps_0: float,
+        phi: float,
+        gamma_xy0: float,
+        y_ref: float,
+    ) -> tuple:
+        """Compute (N, M, V) using MCFT at each layer.
+
+        Strain at elevation y:
+            eps_x(y) = eps_0 - phi * (y - y_ref)
+            gamma_xy(y) = gamma_xy0 * s(y)
+
+        where s(y) is the parabolic shear strain distribution.
+
+        Parameters
+        ----------
+        eps_0 : float
+            Strain at the reference axis.
+        phi : float
+            Curvature (1/mm).
+        gamma_xy0 : float
+            Average shear strain (the global shear DOF).
+        y_ref : float
+            Y-coordinate of the reference axis.
+
+        Returns
+        -------
+        N : float – Axial force (positive tension).
+        M : float – Bending moment about y_ref (positive sagging).
+        V : float – Shear force.
+        """
+        from response_yolo.analysis.mcft import solve_mcft_node
+
+        N = 0.0
+        M = 0.0
+        V = 0.0
+
+        yb = self.y_bottom
+        yt = self.y_top
+
+        # Concrete layers (MCFT biaxial)
+        for lay in self.concrete_layers:
+            dy = lay.y_mid - y_ref
+            eps_x = eps_0 - phi * dy
+            s = self.shear_strain_profile(lay.y_mid, yb, yt)
+            gamma = gamma_xy0 * s
+
+            state = solve_mcft_node(
+                eps_x=eps_x,
+                gamma_xy=gamma,
+                concrete=lay.material,
+                rho_y=lay.rho_y,
+                stirrup_material=lay.stirrup_material,
+            )
+
+            f_x = state.sigma_x * lay.area
+            f_v = state.tau_xy * lay.area
+            N += f_x
+            M -= f_x * dy
+            V += f_v
+
+        # Reinforcing bars (uniaxial — same as existing)
+        for bar in self.rebars:
+            dy = bar.y - y_ref
+            eps_x = eps_0 - phi * dy
+            sig = bar.material.stress(eps_x)
+            f = sig * bar.area
+            N += f
+            M -= f * dy
+
+        # Tendons (uniaxial — same as existing)
+        for t in self.tendons:
+            dy = t.y - y_ref
+            eps_x = eps_0 - phi * dy + t.prestrain
+            sig = t.material.stress(eps_x)
+            f = sig * t.area
+            N += f
+            M -= f * dy
+
+        return N, M, V
+
+    def integrate_stiffness_3x3(
+        self,
+        eps_0: float,
+        phi: float,
+        gamma_xy0: float,
+        y_ref: float,
+    ) -> list:
+        """Compute 3×3 tangent stiffness matrix via finite differences.
+
+        Returns a 3×3 list-of-lists:
+            [[dN/de0,  dN/dphi,  dN/dg ],
+             [dM/de0,  dM/dphi,  dM/dg ],
+             [dV/de0,  dV/dphi,  dV/dg ]]
+
+        Reference: Bentz (2000), Chapter 7.
+        """
+        N0, M0, V0 = self.integrate_forces_shear(eps_0, phi, gamma_xy0, y_ref)
+
+        h_e = max(abs(eps_0) * 1e-6, 1e-9)
+        h_p = max(abs(phi) * 1e-6, 1e-12)
+        h_g = max(abs(gamma_xy0) * 1e-6, 1e-9)
+
+        N1, M1, V1 = self.integrate_forces_shear(eps_0 + h_e, phi, gamma_xy0, y_ref)
+        N2, M2, V2 = self.integrate_forces_shear(eps_0, phi + h_p, gamma_xy0, y_ref)
+        N3, M3, V3 = self.integrate_forces_shear(eps_0, phi, gamma_xy0 + h_g, y_ref)
+
+        return [
+            [(N1 - N0) / h_e, (N2 - N0) / h_p, (N3 - N0) / h_g],
+            [(M1 - M0) / h_e, (M2 - M0) / h_p, (M3 - M0) / h_g],
+            [(V1 - V0) / h_e, (V2 - V0) / h_p, (V3 - V0) / h_g],
+        ]
 
     # ------------------------------------------------------------------
     # Serialization
