@@ -28,23 +28,42 @@
 ## Overview
 
 `response-yolo` is a Python implementation of the Response-2000 reinforced concrete
-analysis program.  It provides a **command-line kernel** designed for automated
-workflows (CI/CD, parameter studies, optimisation loops).
+analysis program.  It is built around a **command-line kernel** allowing for automated
+workflows (parametric studies, optimisation loops, etc.).
 
 Currently implemented:
-- **Moment-curvature (M-phi) analysis** for reinforced and prestressed concrete sections
-- Popovics, Hognestad, and Collins-Mitchell concrete compression models
-- MCFT tension stiffening for cracked concrete
-- Trilinear and bilinear reinforcing steel models
-- Ramberg-Osgood (power formula) prestressing steel model
+**- Define**
+  **- Materials**
+    - Rebar Details:
+      - Elasto-plastic with strain hardening model
+      - Predefined types: CSA G30.12 400 MPa, CSA G30.16 400 MPa Weldable, 1080 MPa Dywidag Bars
+    - Concrete Details:
+      - Base curve: Linear, Parabolic, Popovics/Thorenfeldt/Collins, Elasto-plastic 
+      - Compression softening: Collins-Bentz 2011, none
+      - Tension stiffening: Bentz 1999, none
+    - Prestressing Steel Details:
+      - Ramberg-Osgood model
+      - Predefined types: 1860 MPa Low Relaxation, 1860 MPa Stress Relieved
+  **- Concrete Cross Section**
+    - Basic shapes: Rectangle, Circular, T-beam, I-Beam
+  **- Transverse Reinforcement**
+    - Stirrup spacing
+    - Bar type: Single Leg, Open Stirrup, Closed Stirrup, Hoop
+    - Select by bar area or designation
+  **- Longitudinal Reinforcement**
+    - Individual Layers: number of bars, distance from bottom
+    - Circular Patterns: number of bars, height of centre, diameter on centres, alinged/offset
+    - Select by bar area or designation
+  **- Tendons**
+    - Tendon Layers: number of strands, distance from bottom, prestrain, slope of tendon
+    - Select by strand area or designation
+  
+
+- - **Sectional response** for reinforced and prestressed concrete sections
+
+
 - R2T text file input (compatible with Response-2000 format)
 - JSON input/output for automation
-
-Planned (stubs provided):
-- Sectional shear analysis (V-gamma) via MCFT
-- Moment-shear interaction envelopes (M-V)
-- Full member response (load-deflection)
-- Pushover analysis
 
 ## Installation
 
