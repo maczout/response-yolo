@@ -53,13 +53,124 @@ class TestJSONIO:
             out_path,
             input_file="simple_beam.json",
             analysis_type="moment_curvature",
+            computation_time=1.23,
         )
 
         assert out_path.exists()
         with open(out_path) as f:
             data = json.load(f)
-        assert data["analysis_type"] == "moment_curvature"
-        assert len(data["result"]["response"]) == len(result.points)
+
+        # New spec-compliant envelope
+        assert data["metadata"]["analysis_type"] == "moment_curvature"
+        assert data["metadata"]["computation_time"] == 1.23
+        assert "units" in data
+        assert data["units"]["moment"] == "kNm"
+
+        # Results block
+        results = data["results"]
+        assert len(results["response"]) == len(result.points)
+        assert "control_curves" in results
+        assert "moment_curvature" in results["control_curves"]
+        assert "moment_axial_strain" in results["control_curves"]
+        assert "summary" in results
+
+    def test_save_input_format_detection(self, tmp_path):
+        """Verify the input source format is detected from file extension."""
+        config = load_json_input(EXAMPLES_DIR / "simple_beam.json")
+        xs = config["section"]
+        analysis = MomentCurvatureAnalysis(xs, n_steps=5)
+        result = analysis.run()
+
+        out_json = tmp_path / "out_json.json"
+        save_json_output(result.to_dict(), out_json, input_file="beam.json")
+        with open(out_json) as f:
+            data = json.load(f)
+        assert data["metadata"]["input_source"]["format"] == "response_yolo_json"
+
+        out_r2t = tmp_path / "out_r2t.json"
+        save_json_output(result.to_dict(), out_r2t, input_file="beam.r2t")
+        with open(out_r2t) as f:
+            data = json.load(f)
+        assert data["metadata"]["input_source"]["format"] == "r2t"
+
+
+class TestTransSteel:
+    """Test transverse steel (stirrup) parsing."""
+
+    def test_json_trans_steel(self):
+        """JSON input with trans_steel should set stirrups on the section."""
+        config = load_json_input(EXAMPLES_DIR / "shear_beam.json")
+        xs = config["section"]
+        assert config["analysis_type"] == "shear"
+        # Stirrups should be applied — at least some layers have rho_y > 0
+        assert any(lay.rho_y > 0 for lay in xs.concrete_layers)
+
+    def test_json_trans_steel_inline(self, tmp_path):
+        """Verify trans_steel parsing with explicit data."""
+        inp = {
+            "section": {"shape": "rectangular", "b": 300, "h": 500},
+            "concrete": {"fc": 35},
+            "long_steel": {"fy": 400},
+            "rebars": [{"y": 50, "area": 1500}],
+            "trans_steel": {"fy": 300, "Es": 200000, "Av": 200, "s": 150},
+            "analysis": {"type": "shear"},
+        }
+        p = tmp_path / "shear_input.json"
+        with open(p, "w") as f:
+            json.dump(inp, f)
+
+        config = load_json_input(p)
+        xs = config["section"]
+        assert any(lay.rho_y > 0 for lay in xs.concrete_layers)
+        assert config["analysis_type"] == "shear"
+
+    def test_r2t_trans_steel(self, tmp_path):
+        """R2T input with [TRANS STEEL] should set stirrups."""
+        r2t_text = """\
+[UNITS]
+SI
+
+[CONCRETE]
+fc = 35
+
+[SECTION]
+b = 300
+h = 500
+
+[LONG STEEL]
+fy = 400
+Es = 200000
+
+[REBAR]
+50  1500
+450 400
+
+[TRANS STEEL]
+fy = 400
+Av = 157
+s = 200
+
+[LOADING]
+N = 0
+
+[ANALYSIS]
+shear
+gamma_max = 0.005
+n_steps = 20
+"""
+        p = tmp_path / "shear_test.r2t"
+        p.write_text(r2t_text)
+
+        config = parse_r2t(p)
+        xs = config["section"]
+        assert config["analysis_type"] == "shear"
+        assert any(lay.rho_y > 0 for lay in xs.concrete_layers)
+
+    def test_json_no_trans_steel(self):
+        """JSON input without trans_steel should have all rho_y == 0."""
+        config = load_json_input(EXAMPLES_DIR / "simple_beam.json")
+        xs = config["section"]
+        assert all(lay.rho_y == 0 for lay in xs.concrete_layers)
 
 
 class TestR2TvsJSON:

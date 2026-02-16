@@ -34,6 +34,8 @@ All outputs use consistent units throughout the file:
 | Moment | kNm | kNm |
 | Strain | mm/m | mm/m |
 | Curvature | mrad/m | mrad/m |
+| Shear strain | mm/m | mm/m |
+| Shear force | kN | kN |
 | Crack width | mm | mm |
 | Temperature | °C | °C |
 
@@ -91,13 +93,14 @@ Contains file provenance and version information.
 | `computation_time` | Number | No | Total analysis time (seconds) |
 
 **Analysis types:**
-- `"moment_curvature"`: M-φ curve at constant axial force
+- `"moment_curvature"`: M-φ and M-εx curves at constant axial force
+- `"shear"`: V-γ shear response curve (MCFT-based sectional shear)
 - `"axial_moment"`: P-M interaction diagram
 - `"service_check"`: Service limit state verification
 
 **Input source formats:**
 - `"response_yolo_json"`: Native JSON input
-- `"r2k_xml"`: R2K .r2t file
+- `"r2t"`: Response-2000 R2T text input file
 
 ---
 
@@ -118,6 +121,7 @@ Explicit declaration of units for all quantities in the file.
     "moment": "kNm",
     "strain": "mm/m",
     "curvature": "mrad/m",
+    "shear_strain": "mm/m",
     "crack_width": "mm",
     "temperature": "degC"
   }
@@ -301,7 +305,28 @@ High-level response curves for plotting. These are the primary output for unders
 
 For `moment_curvature`:
 - `moment_curvature`: M vs φ
-- `moment_axial_strain`: M vs ε_ref
+- `moment_axial_strain`: M vs ε_ref (centroidal axial strain)
+
+For `shear`:
+- `shear_strain_response`: V vs γ (average shear strain)
+
+```json
+{
+  "control_curves": {
+    "shear_strain_response": {
+      "description": "Shear Force vs Average Shear Strain",
+      "x_axis": "shear_strain",
+      "y_axis": "shear_force",
+      "data": [
+        {"shear_strain": 0.0, "shear_force": 0.0},
+        {"shear_strain": 0.2, "shear_force": 85.3},
+        {"shear_strain": 0.5, "shear_force": 195.7},
+        {"shear_strain": 1.0, "shear_force": 278.2}
+      ]
+    }
+  }
+}
+```
 
 For `axial_moment`:
 - `axial_moment`: P vs M (interaction diagram)
@@ -663,10 +688,40 @@ High-level summary statistics and key results.
 - `"concrete_crushing"`: Concrete strain exceeded ultimate
 - `"steel_yield"`: Reinforcement yielded (ductile)
 - `"steel_fracture"`: Steel strain exceeded ultimate
+- `"rebar_fracture"`: Reinforcing bar strain exceeded ultimate
+- `"tendon_rupture"`: Prestressing tendon strain exceeded ultimate
 - `"tension_controlled"`: Large tensile strains before failure
 - `"compression_controlled"`: Compression failure before yield
 - `"balanced"`: Simultaneous concrete crushing and steel yield
-- `"divergence"`: Solver failed to converge
+- `"convergence_failure"`: Solver failed to converge
+
+### Shear Summary (for `shear` analysis type)
+
+When `analysis_type` is `"shear"`, the summary includes a `shear_behavior` block:
+
+```json
+{
+  "summary": {
+    "shear_behavior": {
+      "peak_shear_kN": 285.3,
+      "shear_strain_at_peak": 1.24,
+      "failure_reason": "convergence_failure"
+    },
+    "convergence": {
+      "total_points": 51,
+      "converged_points": 48
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `peak_shear_kN` | Number | Peak shear force (kN) |
+| `shear_strain_at_peak` | Number | Average shear strain at peak (mm/m) |
+| `failure_reason` | String | Reason analysis terminated |
+
+**Note:** `analysis_points` is currently a stub (empty array `[]`) for shear analyses. Detailed per-step MCFT element states will be added in a future version.
 
 ---
 

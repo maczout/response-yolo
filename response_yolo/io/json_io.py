@@ -151,6 +151,21 @@ def load_json_input(filepath: str | Path) -> Dict[str, Any]:
             prestrain=td.get("prestrain", 0.005),
         ))
 
+    # Parse transverse steel (stirrups)
+    ts = data.get("trans_steel", None)
+    if ts is not None:
+        stirrup_mat = ReinforcingSteel(
+            fy=ts.get("fy", steel.fy),
+            Es=ts.get("Es", steel.Es),
+        )
+        xs.set_stirrups(
+            Av=ts["Av"],
+            s=ts["s"],
+            material=stirrup_mat,
+            y_bot=ts.get("y_bot"),
+            y_top=ts.get("y_top"),
+        )
+
     # Analysis params
     analysis = data.get("analysis", {})
     loading = data.get("loading", {})
@@ -175,17 +190,46 @@ def save_json_output(
     input_file: str = "",
     analysis_type: str = "moment_curvature",
     section_props: Dict[str, Any] | None = None,
+    computation_time: float | None = None,
 ) -> None:
-    """Save analysis results to a JSON file."""
+    """Save analysis results to a JSON file.
+
+    Produces the spec-compliant output envelope with metadata, units,
+    section_properties, and results.
+    """
+    import datetime
     from response_yolo import __version__
 
+    # Determine input format from file extension
+    input_format = "response_yolo_json"
+    if input_file.endswith(".r2t"):
+        input_format = "r2t"
+
     output = {
-        "version": __version__,
-        "analysis_type": analysis_type,
-        "input_file": input_file,
+        "metadata": {
+            "version": "1.0.0",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "generator": f"response-yolo v{__version__}",
+            "analysis_type": analysis_type,
+            "input_source": {
+                "format": input_format,
+                "file": input_file,
+            },
+        },
+        "units": {
+            "length": "mm",
+            "force": "kN",
+            "stress": "MPa",
+            "moment": "kNm",
+            "strain": "mm/m",
+            "curvature": "mrad/m",
+        },
         "section_properties": section_props or {},
-        "result": result_dict,
+        "results": result_dict,
     }
+
+    if computation_time is not None:
+        output["metadata"]["computation_time"] = computation_time
 
     filepath = Path(filepath)
     with open(filepath, "w") as f:
