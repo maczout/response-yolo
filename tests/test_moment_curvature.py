@@ -111,6 +111,74 @@ class TestMomentCurvature:
         assert len(d["response"]) == len(result.points)
         assert "moment_kNm" in d["response"][0]
 
+    def test_to_dict_spec_structure(self, simple_beam):
+        """to_dict should produce the spec-compliant output structure."""
+        analysis = MomentCurvatureAnalysis(simple_beam, n_steps=20)
+        result = analysis.run()
+        d = result.to_dict()
+
+        # Top-level keys
+        assert "control_curves" in d
+        assert "analysis_points" in d
+        assert "summary" in d
+        assert "response" in d
+
+        # M-phi control curve
+        assert "moment_curvature" in d["control_curves"]
+        mphi = d["control_curves"]["moment_curvature"]
+        assert mphi["x_axis"] == "curvature"
+        assert mphi["y_axis"] == "moment"
+        assert len(mphi["data"]) > 0
+        assert "curvature" in mphi["data"][0]
+        assert "moment" in mphi["data"][0]
+
+        # M-ex control curve
+        assert "moment_axial_strain" in d["control_curves"]
+        mex = d["control_curves"]["moment_axial_strain"]
+        assert mex["x_axis"] == "axial_strain"
+        assert mex["y_axis"] == "moment"
+        assert len(mex["data"]) > 0
+        assert "axial_strain" in mex["data"][0]
+        assert "moment" in mex["data"][0]
+
+        # Both curves should have the same number of converged points
+        assert len(mphi["data"]) == len(mex["data"])
+
+    def test_to_dict_unit_conversions(self, simple_beam):
+        """Control curve units should match the output spec."""
+        analysis = MomentCurvatureAnalysis(simple_beam, n_steps=10)
+        result = analysis.run()
+        d = result.to_dict()
+
+        # Pick the first converged point from raw response
+        raw = d["response"][0]
+        # Curvature: raw 1/mm -> mrad/m (x1e6)
+        mphi_data = d["control_curves"]["moment_curvature"]["data"][0]
+        assert mphi_data["curvature"] == pytest.approx(
+            raw["curvature_1_per_mm"] * 1e6
+        )
+        # Moment: raw N-mm -> kNm (/ 1e6)
+        assert mphi_data["moment"] == pytest.approx(
+            raw["moment_Nmm"] / 1e6
+        )
+        # Axial strain: raw -> mm/m (x1e3)
+        mex_data = d["control_curves"]["moment_axial_strain"]["data"][0]
+        assert mex_data["axial_strain"] == pytest.approx(
+            raw["eps_0"] * 1e3
+        )
+
+    def test_summary_section(self, simple_beam):
+        """Summary should contain section_behavior, failure, convergence."""
+        analysis = MomentCurvatureAnalysis(simple_beam, n_steps=50)
+        result = analysis.run()
+        d = result.to_dict()
+
+        summary = d["summary"]
+        assert "section_behavior" in summary
+        assert "failure" in summary
+        assert "convergence" in summary
+        assert summary["convergence"]["total_points"] == len(result.points)
+
 
 class TestMomentCurvatureHandCalc:
     """Cross-check against simple hand calculations."""

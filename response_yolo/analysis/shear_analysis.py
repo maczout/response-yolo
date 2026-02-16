@@ -56,6 +56,69 @@ class VGammaResult:
         peak_pt = max(self.points, key=lambda p: abs(p.shear_force))
         return peak_pt.gamma_xy0
 
+    def to_dict(self) -> dict:
+        """Serialize to dictionary matching the output spec format.
+
+        Units in control curves follow the output spec:
+        - shear_strain: mm/m (raw × 1e3)
+        - shear_force: kN (raw N ÷ 1e3)
+        - moment: kNm (raw N·mm ÷ 1e6)
+        - curvature: mrad/m (raw 1/mm × 1e6)
+        - axial_strain: mm/m (raw × 1e3)
+        """
+        converged_pts = [p for p in self.points if p.converged]
+        return {
+            "control_curves": {
+                "shear_strain_response": {
+                    "description": "Shear Force vs Average Shear Strain",
+                    "x_axis": "shear_strain",
+                    "y_axis": "shear_force",
+                    "data": [
+                        {
+                            "shear_strain": p.gamma_xy0 * 1e3,
+                            "shear_force": p.shear_force / 1e3,
+                        }
+                        for p in self.points
+                        if p.converged
+                    ],
+                },
+            },
+            "analysis_points": [],  # stub — to be populated in future phases
+            "summary": {
+                "shear_behavior": {
+                    "peak_shear_kN": self.peak_shear / 1e3,
+                    "shear_strain_at_peak": self.gamma_at_peak * 1e3,
+                    "failure_reason": self._failure_reason(),
+                },
+                "convergence": {
+                    "total_points": len(self.points),
+                    "converged_points": len(converged_pts),
+                },
+            },
+            "response": [
+                {
+                    "gamma_xy0": p.gamma_xy0,
+                    "shear_force_N": p.shear_force,
+                    "shear_force_kN": p.shear_force / 1e3,
+                    "moment_Nmm": p.moment,
+                    "moment_kNm": p.moment / 1e6,
+                    "eps_0": p.eps_0,
+                    "curvature_1_per_mm": p.curvature,
+                    "converged": p.converged,
+                }
+                for p in self.points
+            ],
+        }
+
+    def _failure_reason(self) -> str:
+        """Determine why the analysis stopped."""
+        if not self.points:
+            return "no_points"
+        last = self.points[-1]
+        if not last.converged:
+            return "convergence_failure"
+        return ""
+
 
 class ShearAnalysis:
     """Sectional shear analysis using MCFT.

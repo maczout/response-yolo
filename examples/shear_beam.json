@@ -1,0 +1,41 @@
+{
+  "units": "SI",
+  "section": {
+    "shape": "rectangular",
+    "b": 300,
+    "h": 500
+  },
+  "concrete": {
+    "fc": 35,
+    "ecu": 0.0035,
+    "compression_model": "popovics",
+    "tension_model": "mcft",
+    "aggregate_size": 19
+  },
+  "long_steel": {
+    "fy": 400,
+    "Es": 200000,
+    "fu": 600,
+    "esu": 0.05
+  },
+  "rebars": [
+    {"y": 50, "area": 1500},
+    {"y": 450, "area": 400}
+  ],
+  "trans_steel": {
+    "fy": 400,
+    "Es": 200000,
+    "Av": 157,
+    "s": 200
+  },
+  "loading": {
+    "N": 0,
+    "M": 0
+  },
+  "analysis": {
+    "type": "shear",
+    "gamma_max": 0.005,
+    "n_steps": 50,
+    "n_layers": 50
+  }
+}

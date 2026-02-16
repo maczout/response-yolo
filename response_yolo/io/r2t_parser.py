@@ -106,6 +106,17 @@ def parse_r2t(filepath: str | Path) -> Dict[str, Any]:
     for tendon_data in _parse_tendons(sections.get("TENDON", []), sections):
         xs.add_tendon(tendon_data)
 
+    # Parse and apply transverse steel (stirrups)
+    trans = _parse_trans_steel(sections.get("TRANS STEEL", []), steel)
+    if trans is not None:
+        xs.set_stirrups(
+            Av=trans["Av"],
+            s=trans["s"],
+            material=trans["material"],
+            y_bot=trans.get("y_bot"),
+            y_top=trans.get("y_top"),
+        )
+
     # Parse loading
     loading = _parse_loading(sections.get("LOADING", []))
 
@@ -278,6 +289,55 @@ def _parse_prestressing_steel(lines: list) -> PrestressingSteel:
         fpy=props.get("fpy"),
         epu=props.get("epu", 0.04),
     )
+
+
+def _parse_trans_steel(
+    lines: list, default_steel: ReinforcingSteel
+) -> Optional[Dict[str, Any]]:
+    """Parse [TRANS STEEL] section.
+
+    Expected format (key=value or whitespace-delimited)::
+
+        fy = 400
+        Es = 200000
+        Av = 157
+        s = 200
+        y_bot = 50    (optional)
+        y_top = 450   (optional)
+
+    Returns None if the section is empty or missing Av/s.
+    """
+    if not lines:
+        return None
+
+    props: Dict[str, float] = {}
+    for line in lines:
+        parts = re.split(r"[=,\s]+", line, maxsplit=1)
+        if len(parts) == 2:
+            key = parts[0].strip().lower()
+            try:
+                val = float(parts[1].strip())
+            except ValueError:
+                continue
+            props[key] = val
+
+    if "av" not in props or "s" not in props:
+        warnings.warn(
+            "[TRANS STEEL] section found but missing Av or s; ignoring."
+        )
+        return None
+
+    stirrup_mat = ReinforcingSteel(
+        fy=props.get("fy", default_steel.fy),
+        Es=props.get("es", default_steel.Es),
+    )
+    return {
+        "material": stirrup_mat,
+        "Av": props["av"],
+        "s": props["s"],
+        "y_bot": props.get("y_bot"),
+        "y_top": props.get("y_top"),
+    }
 
 
 def _parse_loading(lines: list) -> Dict[str, float]:

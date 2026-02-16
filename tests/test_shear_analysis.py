@@ -179,3 +179,78 @@ class TestSectionIntegrationShear:
         assert s_mid == pytest.approx(1.5, abs=0.01)
         assert s_bot == pytest.approx(0.0, abs=0.01)
         assert s_top == pytest.approx(0.0, abs=0.01)
+
+
+# --------------------------------------------------------------------------
+# V-gamma serialization tests
+# --------------------------------------------------------------------------
+class TestVGammaSerialization:
+    def test_to_dict_structure(self, beam_section):
+        """to_dict should produce spec-compliant structure."""
+        analysis = ShearAnalysis(
+            section=beam_section, gamma_max=0.002, n_steps=5
+        )
+        result = analysis.run()
+        d = result.to_dict()
+
+        # Top-level keys
+        assert "control_curves" in d
+        assert "analysis_points" in d
+        assert "summary" in d
+        assert "response" in d
+
+        # Control curves
+        assert "shear_strain_response" in d["control_curves"]
+        curve = d["control_curves"]["shear_strain_response"]
+        assert curve["x_axis"] == "shear_strain"
+        assert curve["y_axis"] == "shear_force"
+        assert len(curve["data"]) > 0
+
+        # Summary
+        assert "shear_behavior" in d["summary"]
+        assert "convergence" in d["summary"]
+        assert "peak_shear_kN" in d["summary"]["shear_behavior"]
+
+        # Response array
+        assert len(d["response"]) == len(result.points)
+
+    def test_to_dict_values(self, beam_section):
+        """Serialized values should match the result properties."""
+        analysis = ShearAnalysis(
+            section=beam_section, gamma_max=0.002, n_steps=5
+        )
+        result = analysis.run()
+        d = result.to_dict()
+
+        assert d["summary"]["shear_behavior"]["peak_shear_kN"] == pytest.approx(
+            result.peak_shear / 1e3
+        )
+        assert d["summary"]["shear_behavior"]["shear_strain_at_peak"] == pytest.approx(
+            result.gamma_at_peak * 1e3
+        )
+
+        # First point gamma should be 0
+        assert d["response"][0]["gamma_xy0"] == pytest.approx(0.0)
+
+    def test_to_dict_unit_conversions(self, beam_section):
+        """Control curve data should use spec units (mm/m, kN)."""
+        analysis = ShearAnalysis(
+            section=beam_section, gamma_max=0.002, n_steps=3
+        )
+        result = analysis.run()
+        d = result.to_dict()
+
+        # Compare raw vs converted for a converged point
+        for pt in result.points:
+            if pt.converged and pt.gamma_xy0 > 0:
+                # Find matching entry in control curve
+                curve_data = d["control_curves"]["shear_strain_response"]["data"]
+                matching = [
+                    c for c in curve_data
+                    if abs(c["shear_strain"] - pt.gamma_xy0 * 1e3) < 1e-6
+                ]
+                assert len(matching) == 1
+                assert matching[0]["shear_force"] == pytest.approx(
+                    pt.shear_force / 1e3
+                )
+                break

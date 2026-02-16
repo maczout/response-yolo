@@ -111,14 +111,58 @@ class MPhiResult:
         return None
 
     def to_dict(self) -> dict:
+        """Serialize to dictionary matching the output spec format.
+
+        Units in control curves follow the output spec:
+        - curvature: mrad/m (raw 1/mm × 1e6)
+        - moment: kNm (raw N·mm ÷ 1e6)
+        - axial_strain: mm/m (raw × 1e3)
+        """
+        converged_pts = [p for p in self.points if p.converged]
         return {
-            "axial_load_N": self.axial_load,
-            "y_ref_mm": self.y_ref,
-            "failure_reason": self.failure_reason,
-            "cracking_moment_kNm": self.cracking_moment / 1e6 if self.cracking_moment else None,
-            "yield_moment_kNm": self.yield_moment / 1e6 if self.yield_moment else None,
-            "ultimate_moment_kNm": self.ultimate_moment / 1e6 if self.ultimate_moment else None,
-            "n_points": len(self.points),
+            "control_curves": {
+                "moment_curvature": {
+                    "description": "Moment vs Curvature",
+                    "x_axis": "curvature",
+                    "y_axis": "moment",
+                    "data": [
+                        {
+                            "curvature": p.curvature * 1e6,   # mrad/m
+                            "moment": p.moment / 1e6,         # kNm
+                        }
+                        for p in self.points
+                        if p.converged
+                    ],
+                },
+                "moment_axial_strain": {
+                    "description": "Moment vs Reference Axial Strain",
+                    "x_axis": "axial_strain",
+                    "y_axis": "moment",
+                    "data": [
+                        {
+                            "axial_strain": p.eps_0 * 1e3,    # mm/m
+                            "moment": p.moment / 1e6,         # kNm
+                        }
+                        for p in self.points
+                        if p.converged
+                    ],
+                },
+            },
+            "analysis_points": [],  # stub — to be populated in future phases
+            "summary": {
+                "section_behavior": {
+                    "cracking_moment": self.cracking_moment / 1e6 if self.cracking_moment else None,
+                    "yield_moment": self.yield_moment / 1e6 if self.yield_moment else None,
+                    "ultimate_moment": self.ultimate_moment / 1e6 if self.ultimate_moment else None,
+                },
+                "failure": {
+                    "mode": self.failure_reason or None,
+                },
+                "convergence": {
+                    "total_points": len(self.points),
+                    "converged_points": len(converged_pts),
+                },
+            },
             "response": [
                 {
                     "curvature_1_per_mm": p.curvature,
