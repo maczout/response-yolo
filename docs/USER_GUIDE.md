@@ -1,9 +1,12 @@
 # response-yolo User Guide
 
-**Python clone of Response-2000 (R2K) for reinforced concrete sectional analysis**
+**Functional replica of Response-2000 (R2K)**
 
-*Based on the Modified Compression Field Theory (MCFT) by Vecchio & Collins (1986).*
-*Original Response-2000 by Evan Bentz, University of Toronto, 2000.*
+*Reinforced concrete sectional analysis using the Modified Compression Field Theory*
+
+Response-2000 is copyright (c) 1996-2016 E.C. Bentz and M.P. Collins
+
+response-yolo is MIT license
 
 ---
 
@@ -27,44 +30,58 @@
 
 ## Overview
 
-`response-yolo` is a Python implementation of the Response-2000 reinforced concrete
+`response-yolo` is a Python clone of the Response-2000 reinforced concrete
 analysis program.  It is built around a **command-line kernel** allowing for automated
 workflows (parametric studies, optimisation loops, etc.).
 
-Currently implemented:
-**- Define**
-  **- Materials**
-    - Rebar Details:
-      - Elasto-plastic with strain hardening model
-      - Predefined types: CSA G30.12 400 MPa, CSA G30.16 400 MPa Weldable, 1080 MPa Dywidag Bars
-    - Concrete Details:
-      - Base curve: Linear, Parabolic, Popovics/Thorenfeldt/Collins, Elasto-plastic 
-      - Compression softening: Collins-Bentz 2011, none
-      - Tension stiffening: Bentz 1999, none
-    - Prestressing Steel Details:
-      - Ramberg-Osgood model
-      - Predefined types: 1860 MPa Low Relaxation, 1860 MPa Stress Relieved
-  **- Concrete Cross Section**
+
+## Currently implemented
+
+- File
+  - Section definition: .r2t (old line-based and new XML formts) and JSON  
+- Define
+  - General
+    - Title block: Title and General Comments, Analysis By, Date
+    - Automatic or fixed longitudinal crack spacing
+    - Automatic or fixed transverse crack spacing
+    - Moment axis at centroid or fixed
+   - Materials
+     - Rebar Details:
+       - Elasto-plastic with strain hardening model
+       - Predefined types: CSA G30.12 400 MPa, CSA G30.16 400 MPa Weldable, 1080 MPa Dywidag Bars
+     - Concrete Details:
+       - Base curve: Linear, Parabolic, Popovics/Thorenfeldt/Collins, Elasto-plastic 
+       - Compression softening: Collins-Bentz 2011, none
+       - Tension stiffening: Bentz 1999, none
+     - Prestressing Steel Details:
+       - Ramberg-Osgood model
+       - Predefined types: 1860 MPa Low Relaxation, 1860 MPa Stress Relieved
+  - Concrete Cross Section
     - Basic shapes: Rectangle, Circular, T-beam, I-Beam
-  **- Transverse Reinforcement**
+  - Transverse Reinforcement
     - Stirrup spacing
     - Bar type: Single Leg, Open Stirrup, Closed Stirrup, Hoop
     - Select by bar area or designation
-  **- Longitudinal Reinforcement**
+  - Longitudinal Reinforcement
     - Individual Layers: number of bars, distance from bottom
     - Circular Patterns: number of bars, height of centre, diameter on centres, alinged/offset
     - Select by bar area or designation
-  **- Tendons**
+  - Tendons
     - Tendon Layers: number of strands, distance from bottom, prestrain, slope of tendon
     - Select by strand area or designation
-  
-
-- - **Sectional response** for reinforced and prestressed concrete sections
-
-
-- R2T text file input (compatible with Response-2000 format)
-- JSON input/output for automation
-
+ - Loads
+   - Sectional Loads
+     - Constant + Increment Axial Load, Moment, Shear  
+ - Solve
+   - Sectional Response (4 levels of detail)
+   - One Load, 2 Strain, 1 Strain
+   - M-N Interaction, M-V Interaction, N-V Interaction
+  - Options
+   - Preferences
+     - Units: SI Metric, US Customary, kg/cm Metric
+     - Material factors
+     -  
+   
 ## Installation
 
 ```bash
@@ -77,38 +94,59 @@ pip install -e ".[dev]"
 
 Requirements: Python >= 3.10. No external dependencies (pure Python + stdlib).
 
+
 ## Quick Start
 
 ```bash
-# Run a moment-curvature analysis
-response-yolo run examples/simple_beam.json
 
 # View section properties
-response-yolo info examples/simple_beam.json
-
-# Specify output file
-response-yolo run examples/simple_beam.json -o my_results.json
+response-yolo beam.json
 
 # Use R2T format
-response-yolo run examples/simple_beam.r2t
+response-yolo beam.r2t
+
+# Solve axial-strain response
+response-yolo beam.json solve sectional_response [0,0,0 + 1,0,0]  
+
+# Solve moment-curvature response
+response-yolo beam.json solve sectional_response [0,0,0 + 0,1,0] 
+
+# Use custom solver parameters
+response-yolo beam.json solve sectional_response -a params.json  
+
+# Solve moment-axial interaction
+response-yolo beam.json solve M_N_interaction -a params.json
+
+# Specify output file
+response-yolo beam.json solve moment_axial_interaction -a params.json -o beam_results.json
 
 # Quiet mode (JSON only to stdout-compat file, no banner)
-response-yolo run examples/simple_beam.json -q
+response-yolo beam.json solve sectional_response -a params.json -o beam_results.json
 ```
 
 ## Command-Line Interface
 
-### `response-yolo run <input_file>`
+### `response-yolo <input_file> solve *type*`
 
 Run an analysis and write results.
 
+| Type |
+|------|
+| `sectional_response` |
+| `one_load` |
+| `2_strain` |
+| `1_strain` |
+| `M_N_interaction` |
+| `M_V_interaction` |
+| `N_V_interaction` |
+
 | Flag | Description |
 |------|-------------|
+| `-p`, `--params` | Solver parameters file path |
 | `-o`, `--output` | Output file path (default: `<input>_results.json`) |
-| `--format` | Output format: `json` (default) or `csv` |
 | `-q`, `--quiet` | Suppress banner and progress output |
 
-### `response-yolo info <input_file>`
+### `response-yolo <input_file>`
 
 Display section properties without running an analysis.
 
