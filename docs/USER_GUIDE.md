@@ -73,9 +73,6 @@ response-yolo run examples/simple_beam.json -o my_results.json
 # Use R2T format
 response-yolo run examples/simple_beam.r2t
 
-# CSV output
-response-yolo run examples/simple_beam.json --format csv -o results.csv
-
 # Quiet mode (JSON only to stdout-compat file, no banner)
 response-yolo run examples/simple_beam.json -q
 ```
@@ -266,49 +263,7 @@ Supported R2T sections: `[UNITS]`, `[CONCRETE]`, `[SECTION]`, `[LONG STEEL]`,
 
 ## Output Format
 
-### JSON Output
-
-```json
-{
-  "version": "0.1.0",
-  "analysis_type": "moment_curvature",
-  "input_file": "simple_beam.json",
-  "section_properties": {
-    "height_mm": 500.0,
-    "gross_area_mm2": 150000.0,
-    "centroid_y_mm": 250.0,
-    "gross_Ig_mm4": 3.125e+09,
-    "n_concrete_layers": 100,
-    "n_rebars": 2,
-    "n_tendons": 0
-  },
-  "result": {
-    "axial_load_N": 0.0,
-    "y_ref_mm": 250.0,
-    "failure_reason": "concrete_crushing",
-    "cracking_moment_kNm": 29.5,
-    "yield_moment_kNm": 265.6,
-    "ultimate_moment_kNm": 295.6,
-    "n_points": 186,
-    "response": [
-      {
-        "curvature_1_per_mm": 3.5e-07,
-        "curvature_1_per_m": 3.5e-04,
-        "moment_Nmm": 29540000.0,
-        "moment_kNm": 29.54,
-        "eps_0": -9.0e-06,
-        "neutral_axis_y_mm": 275.0,
-        "converged": true
-      }
-    ]
-  }
-}
-```
-
-### CSV Output
-
-When using `--format csv`, the output contains columns:
-`curvature_1/mm`, `curvature_1/m`, `moment_Nmm`, `moment_kNm`, `eps_0`, `neutral_axis_y_mm`
+(see output specification)
 
 ## Material Models
 
